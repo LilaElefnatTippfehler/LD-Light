@@ -13,15 +13,15 @@ To work with the programm these trigger words have to publish Events in the clou
 
 
 
-Event Name      Data
+Event Name     Data
 
-finalColor0     color     //the 0 after finalColor is the Identifier that the color comes from Google Assistant
+finalColor0    color     //the 0 after finalColor is the Identifier that the color comes from Google Assistant
 
-                          //Instead of color use the supported colors in English or German as trigger words in IFTTT
+//Instead of color use the supported colors in English or German as trigger words in IFTTT
                           
 
 
-Google          Reset     //Resets all devices
+Google         Reset     //Resets all devices
 
-Google          TurnOffx  //Turns off device x
+Google         TurnOffx  //Turns off device x
 
