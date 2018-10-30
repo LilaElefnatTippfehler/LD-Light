@@ -4,8 +4,8 @@
 
 // CONFIGURATION SETTINGS START
 // DEBUG SETTINGS:
-#define D_WIFI true        //um den Photon virtuell offline zu nehmen
-#define DEBUG false
+#define D_WIFI false        //um den Photon virtuell offline zu nehmen
+#define DEBUG true
 #define DARK false           //if true puts strip pin on D6
 
 #define NUM_SPARKS 2 // number of Filimins in your group
@@ -22,7 +22,7 @@ String sparkId[] = {
 //Add PIN Configurations for strip in setup()
 
 
-#define SOFTWARE "SWPHALL_1.1"
+#define SOFTWARE "SWPHALL_beta1.8"
 
 
 // TWEAKABLE VALUES FOR CAP SENSING. THE BELOW VALUES WORK WELL AS A STARTING PLACE:
@@ -55,19 +55,21 @@ int rPin = D3;
 #define RELEASE1 4
 #define RELEASE2 5
 #define OFF 6
+#define SLEEP 7
 
 #define END_VALUE 0
 #define TIME 1
 
 // END VALUE, TIME
 // 160 is approximately 1 second
-const long envelopes[6][2] = {
+const long envelopes[7][2] = {
 {0, 0} ,          // OFF
 {255, 30} ,      // ATTACK
 {200, 240},     // DECAY
 {200, 1000},       // SUSTAIN
 {150, 60},     // RELEASE1
-{0, 600000}      // RELEASE2 (65535 is about 6'45")    original: 1000000 100000=~20min
+{0, 600000},      // RELEASE2 (65535 is about 6'45")    original: 1000000 100000=~20min
+{0, 10}             //SLEEP (garbage values)
 };
 
 // NEOPIXEL
@@ -119,6 +121,7 @@ double tBaseline_e=0;
 unsigned char lastColorChangeDeviceId_e = 0;
 long finalColor_e = 0;
 long cloudTouch_e = 0;
+long isOn_e = 0;
 
 //connectionIssueHandler
 int lastConStat = 0;
@@ -131,6 +134,8 @@ struct finalColorHold
 };
 
 struct finalColorHold toDo;
+
+unsigned long sleepUntil = 0;
 
 void setup() {
   SYSTEM_THREAD(DISABLED);
@@ -153,7 +158,6 @@ void setup() {
   
   
   
-  if (D_WIFI) {
     Particle.subscribe("finalColor", colorHandler, MY_DEVICES);
     Particle.subscribe("Reset", ResetHandler, MY_DEVICES);
     Particle.subscribe("Device OFF", SyncOutHandler, MY_DEVICES);
@@ -164,10 +168,12 @@ void setup() {
     Particle.variable("lastDevice",lastColorChangeDeviceId_e);
     Particle.variable("finalColor",finalColor_e);
     Particle.variable("cloudTouch",cloudTouch_e);
+    Particle.variable("isOn",isOn_e);
     
+    System.on(button_final_click,buttonClicked);
     System.on(cloud_status,connectionIssueHandler);
+    
 
-  }
 
   for (byte i = 0; i < 1; i++) {
     for (byte j=0; j<strip.numPixels(); j++) {
@@ -211,11 +217,11 @@ void loop() {
        publish("Software:",SOFTWARE);  //SW Identification
        einDurchlauf++;
     }
-
+  
   touchEvent = touchEventCheck();
   if (touchEvent == tEVENT_TOUCH) {
     currentEvent = touchEvent;
-    state = PRE_ATTACK;
+    if(state != SLEEP) state = PRE_ATTACK;          //helps to keep the lamp asleep
   } else if (touchEvent == tEVENT_RELEASE) {
     currentEvent = touchEvent;
   }
@@ -443,7 +449,7 @@ void stateAndPixelMagic() {
             generateColor();                    //Only point where a new color is calculated
             cloudTouch_e = 0;                   //for Debug, to see the color online without monitoring
             changeState(ATTACK);
-            publish("Debugging","Touch per Hand");
+            publish("Monitoring","Touch per Hand");
             colorLoopCount = 0;
             break;
         case ATTACK:                            //Second stage where cloudTouches start from
@@ -451,6 +457,7 @@ void stateAndPixelMagic() {
             currentEvent = tEVENT_NONE;         //Disables event
             if (loopCount >= envelopes[ATTACK][TIME]) {
                 publish("Debugging","STATE");
+                isOn_e = 1;
               changeState(DECAY);
             }
             break;
@@ -477,11 +484,18 @@ void stateAndPixelMagic() {
             updatePixelSettings();
             if (loopCount >= envelopes[RELEASE2][TIME]) {
                 publish("Device OFF", (String) myId);
+                isOn_e = 0;
                 changeState(OFF);
             }
             break;
         case OFF:
             brightness = 0;
+            break;
+        case SLEEP:
+            brightness = 0;
+            if(Time.hour() == sleepUntil){
+                changeState(OFF);
+            }
             break;
         default:
             changeState(PRE_ATTACK);
@@ -499,7 +513,7 @@ void stateAndPixelMagic() {
 
 int cloudTouch(int color){ 
     int cloudColor = color;
-    publish("Debugging","Cloud Touch triggered");
+    publish("Monitoring","Cloud Touch triggered");
     if((cloudColor != finalColor) && (myId != cloudId)){         //Color from Cloud is not the same as own color
         cloudTouch_e = 1;                               //for Debug, to see the color online without monitoring
         getColorFromCloud(cloudColor);             //Define cloudColor as new final color
@@ -514,7 +528,7 @@ int cloudTouch(int color){
 
 void getColorFromCloud(int color) {
       finalColor = color;
-      publish("Debugging","FinalColor is:" + (String) finalColor);
+      publish("Monitoring","FinalColor is:" + (String) finalColor);
       colorChangeToNextState = finalColor - currentColor;                                               //Color calculating magic
       colorChangeToNextState += ((colorChangeToNextState < 0) * 2 - 1) * (abs(colorChangeToNextState) > 127) * 256;
       initColor = currentColor;
@@ -570,21 +584,45 @@ void publish(String eventName, String data)
     }else{
         if(eventName == ("finalColor" + (String) myId)){
         if(Particle.connected()){
-                Particle.publish(eventName, data, 60, PRIVATE);       //publishing finalColor + myId for identification
+                if (D_WIFI)Particle.publish(eventName, data, 60, PRIVATE);       //publishing finalColor + myId for identification
             }else
             {
                 toDo.id = myId;
                 toDo.data = finalColor;
-                toDo.flag = 1;
+                if (D_WIFI)toDo.flag = 1;
             }
     }else{
-        Particle.publish(eventName, data, 60, PRIVATE);
+        if(eventName == "Monitoring"){
+            Particle.publish(eventName, data + " " + Time.day() + " " + Time.hour() + " " + Time.minute() + " " + Time.second(), 60, PRIVATE);
+        }
+        if (D_WIFI)Particle.publish(eventName, data, 60, PRIVATE);
     }
     }
     
     
 }
 
+void visualReact(uint32_t color, int maxBright){
+    for (int i =0; i <= maxBright;) {
+        strip.setBrightness(i);
+    for (byte j = 0; j < strip.numPixels(); j++) {
+      strip.setPixelColor(j, color);
+      strip.show();
+    }
+    delayMicroseconds(10);
+    i = i + 10;
+  }
+  for (int j = maxBright; j >= 0;) {
+      strip.setBrightness(j);
+    for (byte k = 0; k < strip.numPixels();k++) {
+      strip.setPixelColor(k, color);
+      strip.show();
+    }
+    delayMicroseconds(10);
+    j= j - 10;
+  }
+  
+}
 
 void colorHandler(const char *event, const char *data)
     {
@@ -599,7 +637,7 @@ void colorHandler(const char *event, const char *data)
         cloudColor = data1.toInt();                         //extractes color
         cloudId = (int) Id;                                 //converting Id to Int
         cloudId = cloudId - 48;                             //ASCII Offset
-        publish("Debugging","Device identified as:" + (String) cloudId);
+        publish("Monitoring","Device identified as:" + (String) cloudId);
         if(myId != cloudId){
             
             cloudTouch(cloudColor);
@@ -626,11 +664,11 @@ void connectionIssueHandler(system_event_t event, int data){
     int data1 = data;
     if(data1 != lastConStat){
         if(data1 == cloud_status_connected){                 //checks if connection has been reastablished
-            if(toDo.flag == 1) Particle.publish("finalColor" + (String) toDo.id, (String) toDo.data, 60, PRIVATE);         //if it had been touched and was not connected to the Cloud, it retries.
+            if(toDo.flag == 1) publish("finalColor" + (String) toDo.id, (String) toDo.data);         //if it had been touched and was not connected to the Cloud, it retries.
             toDo.id = 0;
             toDo.data = 0;
             toDo.flag = 0;
-            Particle.publish("Repeat",(String) myId, 60, PRIVATE);    //asks for the finalColor of ALL other devices. only lastColorChangeDevice answers. 
+            publish("Repeat",(String) myId);                        //asks for the finalColor of ALL other devices. only lastColorChangeDevice answers. 
                                                                     //if they all have the same color (wich should be), nothing happens, devices with other colors get updated.
                                                                     //BUG POTENTIAL!! when there are many devices and there are two or more connection Issues and they ask for
                                                                     //repeat at the same time and got touched while offline, there might be chaos.
@@ -641,8 +679,47 @@ void connectionIssueHandler(system_event_t event, int data){
 }
 
 void repeatHandler(const char *event, const char *data){    //publishes the color currently displayed if the lamp is the source of the color.
-    String data1 = data;                                    //and if it is not OFF or in PRE_ATTACK state
-    if(data1.toInt() != myId && lastColorChangeDeviceId == myId && state != PRE_ATTACK && state != OFF){
+    String data1 = data;                                    //and if it is not OFF or in PRE_ATTACK or SLEEP state
+    if(data1.toInt() != myId && lastColorChangeDeviceId == myId && state != PRE_ATTACK && state != OFF && state != SLEEP){
         publish("finalColor" + (String) myId, (String) finalColor);
     }
+}
+
+void buttonClicked(system_event_t event, int param){
+    
+    //system_event_t x = event;
+    int count = system_button_clicks(param);
+    
+    //publish("Debugging", "Button Press detected");
+    
+    
+    if(count == 2){
+        if(Time.hour() >= 8 && Time.hour() <= 21){      //Deactivates the lamp for 4 hours during day.
+            sleepUntil = Time.hour() + 4;
+            if(sleepUntil >= 24) sleepUntil = sleepUntil - 24;
+        }
+        else{                                           //During the night deactivates the lamp till 8am.
+            sleepUntil = 8;
+        }
+        isOn_e = 0;
+        //changeState(SLEEP);
+        state = SLEEP;
+        visualReact(strip.Color(255,0,0),200);          //reacts via two flashes
+        visualReact(strip.Color(0,0,255),200);
+        //publish("Debugging", "Sleep Mode activated until " + (String) sleepUntil);
+    }
+    if(count == 1){                               //Turns the lamp off
+        isOn_e = 0;
+        //changeState(OFF);
+        state == OFF;
+        visualReact(strip.Color(255,0,0),200);          //reacts via one flash
+        //publish("Debugging", "Turned OFF");
+    }
+    if(count == 3){                              //resets Lamp
+        visualReact(strip.Color(255,0,0),200);          //reacts via three flashes
+        visualReact(strip.Color(0,0,255),200);
+        visualReact(strip.Color(0,255,0),200);
+        System.reset();
+    }
+
 }
