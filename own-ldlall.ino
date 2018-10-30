@@ -11,8 +11,8 @@
 #define NUM_SPARKS 2 // number of Filimins in your group
 String sparkId[] = {
   "",                                       // 0
-  "24003f001347353136383631",                // number each Filimin starting at 1. Replace the number in the quotes with Spark ID for Filimin 1
-  "320033000e47353136383631",                // Filimin 2
+  "111111111111111111111111",                // number each Filimin starting at 1. Replace the number in the quotes with Spark ID for Filimin 1
+  "222222222222222222222222",                // Filimin 2
 };
 
 //--------------SETUP for more than two Lamps----------------------------
@@ -803,17 +803,20 @@ void buttonClicked(system_event_t event, int param){
             sleepUntil = 8;
         }
         isOn_e = 0;
-        //changeState(SLEEP);
-        state = SLEEP;
         visualReact(strip.Color(255,0,0),200);          //reacts via two flashes
         visualReact(strip.Color(0,0,255),200);
+        
+        changeState(RELEASE2);
+        loopCount = 99999999999;
+        stateAndPixelMagic();
+        changeState(SLEEP);
         //publish("Debugging", "Sleep Mode activated until " + (String) sleepUntil);
     }
     if(count == 1){                               //Turns the lamp off
         isOn_e = 0;
-        //changeState(OFF);
-        state == OFF;
         visualReact(strip.Color(255,0,0),200);          //reacts via one flash
+        changeState(RELEASE2);
+        loopCount = 99999999999;
         //publish("Debugging", "Turned OFF");
     }
     if(count == 3){                              //resets Lamp
