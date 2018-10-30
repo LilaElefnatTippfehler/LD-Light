@@ -11,17 +11,22 @@ Also supports Google Assistant now. Use IFTTT to build your own trigger words.
 
 To work with the programm these trigger words have to publish Events in the cloud in this form:
 
+Event Name:
+
+finalColor0 *The 0 is for identification of the google Assistent*
+
+Data:
+
+color *here should be the word you said to the google Assistent*
 
 
-Event Name     Data
+Event Name:
 
-finalColor0    color     //the 0 after finalColor is the Identifier that the color comes from Google Assistant
+Google
 
-//Instead of color use the supported colors in English or German as trigger words in IFTTT
-                          
+Data:
 
+Reset *Resets all devices*
 
-Google         Reset     //Resets all devices
-
-Google         TurnOffx  //Turns off device x
+TurnOffx *Turns off device x"
 
