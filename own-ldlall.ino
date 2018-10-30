@@ -160,7 +160,7 @@ void setup() {
   
     Particle.subscribe("finalColor", colorHandler, MY_DEVICES);
     Particle.subscribe("Reset", ResetHandler, MY_DEVICES);
-    Particle.subscribe("Device OFF", SyncOutHandler, MY_DEVICES);
+    Particle.subscribe("Google", GoogleHandler, MY_DEVICES);
     Particle.subscribe("Repeat", repeatHandler, MY_DEVICES);
     
     Particle.variable("tDelay",tDelay_e);
@@ -736,12 +736,29 @@ void ResetHandler(const char *event, const char *data)
         if(data1.toInt() == 0) System.reset();              //Global Reset
     }
 
-void SyncOutHandler(const char *event, const char *data)
+void GoogleHandler(const char *event, const char *data)
 {
+    String event1 = event;
     String data1 = data;
-    if(data1.toInt() != myId){
-        //changeState(OFF);         //doesnt work properly
-    }        //turn of if other Photon turns off.
+    char Id;
+    int googleId;
+    
+    for(int i=0; i<=strlen(data1); i++){               //searches for digit in string wich is the DeviceId
+            if(isdigit(data1[i])) Id = data1[i];
+        }
+    googleId = (int) Id - 48;
+    publish("Debugging","Identified Id for TurnOff " + (String) googleId);
+    
+    if(data1 == "Reset"){                               //Reset if data is reset
+        publish("Debugging","Reseting system");
+        System.reset();
+    }
+    
+    if(googleId == myId && !(strncmp(data1,"TurnOff",strlen("TurnOff")))){
+        publish("Debugging","Turning off system");      //Turning off the system if id and command are correct
+        changeState(RELEASE2);
+        loopCount = 99999999999;                        //Also set the loopcount as high as possible so that Release2 is already finished
+    }
 }
 
 void connectionIssueHandler(system_event_t event, int data){
