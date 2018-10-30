@@ -11,8 +11,8 @@
 #define NUM_SPARKS 2 // number of Filimins in your group
 String sparkId[] = {
   "",                                       // 0
-  "111111111111111111111111",                // number each Filimin starting at 1. Replace the number in the quotes with Spark ID for Filimin 1
-  "222222222222222222222222",                // Filimin 2
+  "24003f001347353136383631",                // number each Filimin starting at 1. Replace the number in the quotes with Spark ID for Filimin 1
+  "320033000e47353136383631",                // Filimin 2
 };
 
 //--------------SETUP for more than two Lamps----------------------------
@@ -22,7 +22,7 @@ String sparkId[] = {
 //Add PIN Configurations for strip in setup()
 
 
-#define SOFTWARE "SWPHALL_beta1.8"
+#define SOFTWARE "SWPHALL_beta1.9"
 
 
 // TWEAKABLE VALUES FOR CAP SENSING. THE BELOW VALUES WORK WELL AS A STARTING PLACE:
@@ -526,6 +526,19 @@ int cloudTouch(int color){
     
 }
 
+void googleAssistTouch(String color){
+    
+    //Basicly Imitating the Pre-Attack State
+    finalColor = getColorfromString(color);
+    colorChangeToNextState = finalColor - currentColor;
+    colorChangeToNextState += ((colorChangeToNextState < 0) * 2 - 1) * (abs(colorChangeToNextState) > 127) * 256;
+    initColor = currentColor;
+    changeState(ATTACK);
+    colorLoopCount = 0;
+    stateAndPixelMagic();
+    
+}
+
 void getColorFromCloud(int color) {
       finalColor = color;
       publish("Monitoring","FinalColor is:" + (String) finalColor);
@@ -624,6 +637,71 @@ void visualReact(uint32_t color, int maxBright){
   
 }
 
+int getColorfromString(String colorAss){
+    
+    //cause of german the first letter might be Uppercase
+    String color = colorAss;
+    if(isupper(color[0])){
+        color[0] = tolower(color[0]);
+    }
+    
+    String red =    "red rot";
+    String green =  "green grün";
+    String blue =   "blue blau";
+    String yellow = "yellow gelb";
+    String orange = "orange";
+    String purple = "purple lila";
+    String cyan =   "cyan türkis";
+    
+    int translatedColor = 0;
+    
+    if(strstr(red, color)){
+        translatedColor = 85;   //Pure Red      
+    }                           //R=255 G=000 B=000
+    if(strstr(green, color)){
+        translatedColor = 0;    //Pure Green
+    }                           //R=000 G=255 B=000
+    if(strstr(blue, color)){
+        translatedColor = 170;  //Pure Blue
+    }                           //R=000 G=000 B=255
+    if(strstr(yellow, color)){
+        translatedColor = 42;   //Yellow         
+    }                           //R=126 G=129 B=000
+    if(strstr(orange, color)){
+        translatedColor = 60;   //Orange
+    }                           //R=180 G=75  B=000
+    if(strstr(purple, color)){
+        translatedColor = 127;  //Purple
+    }                           //R=129 G=000 B=126
+    if(strstr(cyan, color)){
+        translatedColor = 212;   //Cyan
+    }                           //R=000 G=126 B=129
+    
+    /*
+    Just add colors that you like here
+    the string are the words that you have to say to google assistant
+    to get the colors you want use the code from wheeleColor(); or look here:
+    
+    if (Color < 85) {
+        R = Color * 3;
+        G = 255 - Color * 3;
+        B = 0;
+    }else if (Color < 170) {
+        Color -= 85;
+        R = 255 - Color * 3;
+        G = 0;
+        B = Color * 3;
+    } else {
+        Color -= 170;
+        R = 0;
+        G = Color * 3;
+        B = 255 - Color * 3;
+    }
+    */
+    
+    return translatedColor;
+}
+
 void colorHandler(const char *event, const char *data)
     {
         String data1 = data;
@@ -638,6 +716,12 @@ void colorHandler(const char *event, const char *data)
         cloudId = (int) Id;                                 //converting Id to Int
         cloudId = cloudId - 48;                             //ASCII Offset
         publish("Monitoring","Device identified as:" + (String) cloudId);
+        
+        if(cloudId == 0){                               //including the Google Assist functions into an existing Handler
+            googleAssistTouch(data1);                   //data1 will be strings like "red" "green" "orange" in english and german
+            return;
+        }
+        
         if(myId != cloudId){
             
             cloudTouch(cloudColor);
