@@ -24,11 +24,7 @@
 //          (or find a way to automate it, found it hard as it is realised as preprocessor Comand)
 //Add PIN Configurations for strip in setup()
 
-byte server[] = { 192,168,0,220 };
-MQTT client(server, 1883, callback);
-#define DEVICENAME "LDL"
-#define MQTT_USR "andi"
-#define MQTT_PW "andi12"
+
 unsigned long lastReconnectAttempt = 0;
 
 #define SOFTWARE "SWPHALL_1.2"
