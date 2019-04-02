@@ -8,7 +8,7 @@
 // This #include statement was automatically added by the Particle IDE.
 #include <neopixel.h>
 
-
+#include "config.h"
 
 // CONFIGURATION SETTINGS START
 // DEBUG SETTINGS:
@@ -16,12 +16,7 @@
 #define DEBUG false
 #define DARK false           //if true puts strip pin on D6
 
-#define NUM_SPARKS 2 // number of Filimins in your group
-String sparkId[] = {
-        "",                                 // 0
-        "111111111111111111111111",          // number each Filimin starting at 1. Replace the number in the quotes with Spark ID for Filimin 1
-        "222222222222222222222222",          // Filimin 2
-};
+
 
 //--------------SETUP for more than two Lamps----------------------------
 //Above put in your Photons ID
