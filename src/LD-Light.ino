@@ -17,14 +17,6 @@
 #define DARK false           //if true puts strip pin on D6
 
 
-
-//--------------SETUP for more than two Lamps----------------------------
-//Above put in your Photons ID
-//define more SENSITIVITY and BASELINE_SENSITIVITY for each Lamp. Here below, in touchSampling() and in touchEventCheck()
-//          (or find a way to automate it, found it hard as it is realised as preprocessor Comand)
-//Add PIN Configurations for strip in setup()
-
-
 unsigned long lastReconnectAttempt = 0;
 
 #define SOFTWARE "SWPHALL_1.2"
