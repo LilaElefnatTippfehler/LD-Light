@@ -36,7 +36,7 @@ void colorChange::setColor(NeoPixel_wrapper *strip, colorPoint newColor){
                 float b = current.getB() + norm.getB();
                 current.setRGBL(r, g, b);
                 //for(int j=0; j<strip->numPixels(); j++) {
-                strip->setPixelColor(current.getIntR(),current.getIntG(),current.getIntB());
+                strip->setPixelColor(current);
                 //}
                 strip->show();
                 delay(5);
@@ -49,6 +49,7 @@ void colorChange::setBrightness(NeoPixel_wrapper *strip, uint8_t brightness){
         int32_t deltaL = brightness - strip->getBrightness();
         if(SERIAL_COLORCHANGE) {
                 Serial.print("deltaL "); Serial.println(deltaL);
+                Serial.print("brightness "); Serial.println(strip->getBrightness());
         }
         if(deltaL < 0) {
                 for(int32_t i = 0; i > deltaL; i--) {
@@ -97,7 +98,7 @@ void colorChange::setColorAndBright(NeoPixel_wrapper *strip, colorPoint newColor
                 float l = current.getL() + norm.getL();
                 current.setRGBL(r, g, b, l);
                 //for(int j=0; j<strip->numPixels(); j++) {
-                strip->setPixelColor(current.getIntR(),current.getIntG(),current.getIntB());
+                strip->setPixelColor(current);
                 //}
                 strip->setBrightness(current.getIntL());
                 strip->show();
