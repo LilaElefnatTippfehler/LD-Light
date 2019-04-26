@@ -1,7 +1,7 @@
 // This #include statement was automatically added by the Particle IDE.
 //#define ARDUINOJSON_ENABLE_PROGMEM 0
 #include <ArduinoJson.h>
-#include <MQTT.h>
+#include <PubSubClient.h>
 #include <Particle.h>
 #include <Arduino.h>
 #include <math.h>
@@ -9,9 +9,10 @@
 #include "colorVector.h"
 #include "colorChange.h"
 #include "config.h"
+#include "homie.hpp"
 
 // CONFIGURATION SETTINGS START
-#define SERIAL true
+#define SERIAL false
 
 using namespace colorChange;
 
@@ -26,7 +27,7 @@ int rPin = D3;
 #define PIXEL_TYPE WS2812B
 
 NeoPixel_wrapper *strip = new NeoPixel_wrapper(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
-MQTT client(server, 1883, callback);
+PubSubClient client(server, 1883, callback);
 
 //connectionIssueHandler
 int lastConStat = 0;
@@ -34,8 +35,21 @@ int lastConStat = 0;
 
 void setup() {
         colorChange::init(strip, D1);
-
         pinMode(sPin,OUTPUT);
+
+        HomieDevice device = HomieDevice(String(DEVICENAME), "Cube", WiFi.localIP()
+                                         "00:00:00:00", FW_NAME, FW_VERSION,
+                                         "esp8266", "60");
+        HomieNode rgbRing = HomieNode("rgb-ring", "RGB Ring", "neoPixel");
+        HomieProperties brightness = HomieProperties("brightness", "Brightness",
+                                                     true, true, "%",
+                                                     homie::integer, "0:100");
+        HomieProperties rgb = HomieProperties("rgb", "RGB", true, true, "",
+                                              homie::color, "rgb");
+        rgbRing.addProp(brightness);
+        rgbRing.addProp(rgb);
+        device.addNode(rgbRing);
+        device.init();
 }
 
 void loop() {
@@ -69,8 +83,8 @@ boolean reconnect() {
                 Particle.publish("Connected","successfully");
         } else {
                 Particle.publish("MQTT conncetion failed,", " try again in 5 seconds");
-                Serial.print("MQTT conncetion failed,");
-                Serial.println(" try again in 5 seconds");
+                if(SERIAL) Serial.print("MQTT conncetion failed,");
+                if(SERIAL) Serial.println(" try again in 5 seconds");
         }
         return client.isConnected();
 }
@@ -82,7 +96,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
         Particle.publish(buffer,"received");
         sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/payload");
         Particle.publish(buffer, (char *) payload);
-        Serial.print("payload"); Serial.println((char *) payload);
+        if(SERIAL) Serial.print("payload");
+        if(SERIAL) Serial.println((char *) payload);
         sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/cmd");
         if (!strcmp(buffer, topic)) {
                 const int capacity = JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(3);
@@ -99,22 +114,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
                         }else{
                                 if(cmd.containsKey("color")) {
                                         uint32_t rgb = cmd["color"];
-                                        Serial.print("color "); Serial.println(String((long)rgb));
+                                        if(SERIAL) Serial.print("color ");
+                                        if(SERIAL) Serial.println(String((long)rgb));
                                         colorPoint newColor = colorPoint(rgb);
                                         colorChange::setColor(strip, newColor);
                                 }
                                 if(cmd.containsKey("brightness")) {
                                         uint8_t lum = cmd["brightness"];
-                                        Serial.print("brightness "); Serial.println(String((long)lum));
+                                        if(SERIAL) Serial.print("brightness ");
+                                        if(SERIAL) Serial.println(String((long)lum));
                                         colorChange::setBrightness(strip, lum);
                                 }
                         }
 
                 }else{
-                        Serial.print("Couldnt parse Json Object from: ");
-                        Serial.println(topic);
-                        Serial.print("Error: ");
-                        Serial.println(err.c_str());
+                        if(SERIAL) Serial.print("Couldnt parse Json Object from: ");
+                        if(SERIAL) Serial.println(topic);
+                        if(SERIAL) Serial.print("Error: ");
+                        if(SERIAL) Serial.println(err.c_str());
 
                 }
         }
@@ -128,7 +145,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 colorChange::setColor(strip,newColor);
                 sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/status");
                 client.publish(buffer, "color change");
-                Serial.print("statusp"); Serial.println(p);
+                if(SERIAL) Serial.print("statusp");
+                if(SERIAL) Serial.println(p);
         }
         sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/brightness");
         if (!strcmp(buffer, topic)) {
@@ -139,7 +157,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 colorChange::setBrightness(strip, brightness);
                 sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/status");
                 client.publish(buffer,"brightness change");
-                Serial.print("statusp"); Serial.println(p);
+                if(SERIAL) Serial.print("statusp");
+                if(SERIAL) Serial.println(p);
         }
 
 }

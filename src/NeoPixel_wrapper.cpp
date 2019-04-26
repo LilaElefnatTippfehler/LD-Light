@@ -12,7 +12,10 @@ void NeoPixel_wrapper::show(void){
 }
 void NeoPixel_wrapper::setPin(uint8_t p){
         this->strip.setPin(p);
-        this->currentColor.setRGBL((float) 0, (float) 0, (float) 0,(float) 255);
+        this->currentColor.setRGBL((float) (rand()%256), (float) (rand()%256), (float) (rand()%256),(float) 255);
+        this->strip.show();
+        this->setBrightness(0);
+
 }
 void NeoPixel_wrapper::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b){
         this->currentColor.setRGBL(r,g,b,currentColor.getIntL());

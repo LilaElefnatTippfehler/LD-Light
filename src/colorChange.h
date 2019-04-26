@@ -6,7 +6,7 @@
 #include "colorPoint.h"
 #include "NeoPixel_wrapper.h"
 
-#define SERIAL_COLORCHANGE true
+#define SERIAL_COLORCHANGE false
 
 namespace colorChange
 {
