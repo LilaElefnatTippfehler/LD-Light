@@ -16,3 +16,7 @@ MQTT client(server, 1883, callback);
 #define DEVICENAME "DEVICENAME"
 #define MQTT_USR "username"
 #define MQTT_PW "password"
+#define FW_NAME "firmware-name"
+#define FW_VERSION "0.0.0"
+#define NODE_DIMMER "node-name"
+#define IMPLEMENTATION "particle-photon"
