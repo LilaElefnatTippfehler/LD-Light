@@ -2,3 +2,4 @@
 p_firmware*
 *_firmware_*
 config.h
+project.properties
