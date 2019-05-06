@@ -1,7 +1,7 @@
 // This #include statement was automatically added by the Particle IDE.
 //#define ARDUINOJSON_ENABLE_PROGMEM 0
 #include <ArduinoJson.h>
-#include <PubSubClient.h>
+#include <MQTT.h>
 #include <Particle.h>
 #include <Arduino.h>
 #include <math.h>
@@ -9,7 +9,7 @@
 #include "colorVector.h"
 #include "colorChange.h"
 #include "config.h"
-#include "homie.hpp"
+#include "homie.h"
 
 // CONFIGURATION SETTINGS START
 #define SERIAL false
@@ -26,8 +26,15 @@ int rPin = D3;
 #define PIXEL_COUNT 16
 #define PIXEL_TYPE WS2812B
 
+uint16_t port = 1883;
+TCPClient tcpClient;
 NeoPixel_wrapper *strip = new NeoPixel_wrapper(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
-PubSubClient client(server, 1883, callback);
+MQTT client(MQTT_SERVER, port, callback);
+Homie homieCTRL = Homie(&client);
+
+
+Timer pubTimer(60000, &callbackPubTimer);
+uint8_t flag_pubTimer = 0;
 
 //connectionIssueHandler
 int lastConStat = 0;
@@ -37,24 +44,30 @@ void setup() {
         colorChange::init(strip, D1);
         pinMode(sPin,OUTPUT);
 
-        HomieDevice device = HomieDevice(String(DEVICENAME), "Cube", WiFi.localIP()
-                                         "00:00:00:00", FW_NAME, FW_VERSION,
-                                         "esp8266", "60");
+        HomieDevice homieDevice = HomieDevice(DEVICENAME, "Cube", "192.168.0.1",
+                                              "AA:BB:CC:DD",FW_NAME, FW_VERSION,
+                                              "esp8266", "60");
         HomieNode rgbRing = HomieNode("rgb-ring", "RGB Ring", "neoPixel");
         HomieProperties brightness = HomieProperties("brightness", "Brightness",
                                                      true, true, "%",
-                                                     homie::integer, "0:100");
+                                                     homie::integer_t, "0:100");
         HomieProperties rgb = HomieProperties("rgb", "RGB", true, true, "",
-                                              homie::color, "rgb");
+                                              homie::color_t, "rgb");
+        HomieProperties color = HomieProperties("color", "Color",
+                                                true, true, "",
+                                                homie::integer_t, "");
         rgbRing.addProp(brightness);
         rgbRing.addProp(rgb);
-        device.addNode(rgbRing);
-        device.init();
+        rgbRing.addProp(color);
+        homieDevice.addNode(rgbRing);
+        homieCTRL.setDevice(homieDevice);
+
+        pubTimer.start();
 }
 
 void loop() {
 
-        if (!client.isConnected()) {
+        if (!homieCTRL.connected()) {
                 unsigned long now = millis();
                 if (now - lastReconnectAttempt > 5000) {
                         lastReconnectAttempt = now;
@@ -65,32 +78,64 @@ void loop() {
                 }
         }
         client.loop();
+        if(flag_pubTimer == 1) {
+                long time = millis() / 1000;
+                string topic = "homie/" + string(DEVICENAME) + "/$stats/uptime";
+                char payload[20];
+                sprintf(payload, "%ld", time);
+                client.publish(topic.c_str(), payload,true);
+                flag_pubTimer = 0;
+        }
 
 
 }
 
 boolean reconnect() {
         // Loop until we're reconnected
-        if (client.connect(String(DEVICENAME), MQTT_USR, MQTT_PW)) {
-                char buffer[100];
-                sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/cmd");
-                client.subscribe(buffer);
-                sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/color");
-                client.subscribe(buffer);
-                sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/brightness");
-                client.subscribe(buffer);
-                client.publish("/actu/LDL/status","connected");
-                Particle.publish("Connected","successfully");
-        } else {
-                Particle.publish("MQTT conncetion failed,", " try again in 5 seconds");
-                if(SERIAL) Serial.print("MQTT conncetion failed,");
-                if(SERIAL) Serial.println(" try again in 5 seconds");
-        }
-        return client.isConnected();
+        return homieCTRL.connect("Cube", String(MQTT_USR), String(MQTT_PW));
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
+        string topicString = string(topic);
+        if(SERIAL) Serial.println(topicString.c_str());
 
+        std::size_t found = topicString.find("rgb-ring/brightness/set");
+        if(found!=std::string::npos) {
+                char p[length + 1];
+                snprintf(p, length + 1, "%s", payload);
+                p[length] = 0;
+                uint32_t brightness = atol(p);
+                colorChange::setBrightness(strip, brightness);
+        }
+
+        found = topicString.find("rgb-ring/rgb/set");
+        if(found!=std::string::npos) {
+                char p[length + 1];
+                memcpy(p, payload, length);
+                p[length] = 0;
+                char *r;
+                char *g;
+                char *b;
+                r = &p[0];
+                g = strchr(p, ',') + 1;
+                b = strrchr(p, ',') + 1;
+                *(g-1) = 0;
+                *(b-1) = 0;
+                colorPoint newColor = colorPoint((uint8_t)atol(r),(uint8_t)atol(g),(uint8_t)atol(b));
+                colorChange::setColor(strip,newColor);
+        }
+
+        found = topicString.find("rgb-ring/color/set");
+        if(found!=std::string::npos) {
+                char p[length + 1];
+                memcpy(p, payload, length);
+                p[length] = 0;
+                uint32_t colorN = atol(&p[0]);
+                colorPoint newColor = colorPoint(colorN);
+                colorChange::setColor(strip,newColor);
+        }
+
+/*
         char buffer[100];
         sprintf(buffer, "%s%s%s", "/actu/", DEVICENAME, "/status");
         Particle.publish(buffer,"received");
@@ -159,6 +204,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
                 client.publish(buffer,"brightness change");
                 if(SERIAL) Serial.print("statusp");
                 if(SERIAL) Serial.println(p);
-        }
+        }*/
 
+}
+
+void callbackPubTimer(){
+        flag_pubTimer = 1;
 }
